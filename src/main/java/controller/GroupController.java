@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -85,5 +86,33 @@ public class GroupController {
         groupRepository.save(group);
 
         return ResponseEntity.ok(group);
+    }
+
+    @GetMapping("/mine")
+    public ResponseEntity<?> getMyGroups() {
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String loggedInEmail = authentication.getName();
+
+        Optional<User> userOptional = userRepository.findByEmail(loggedInEmail);
+        User currentUser = userOptional.get();
+
+        List<Group> groups = groupRepository.findAll().stream()
+                .filter(group -> group.getMembers().contains(currentUser))
+                .toList();
+
+        return ResponseEntity.ok(groups);
+    }
+
+    @GetMapping("/{groupId}")
+    public ResponseEntity<?> getGroup(@PathVariable Long groupId) {
+
+        Optional<Group> groupOptional = groupRepository.findById(groupId);
+
+        if (groupOptional.isEmpty()) {
+            return ResponseEntity.status(404).body("Group not found");
+        }
+
+        return ResponseEntity.ok(groupOptional.get());
     }
 }

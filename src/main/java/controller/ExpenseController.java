@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 import com.expense_splitter.expense_splitter.dto.BalanceResponse;
 import com.expense_splitter.expense_splitter.model.ExpenseShare;
 import com.expense_splitter.expense_splitter.repository.ExpenseShareRepository;
+import com.expense_splitter.expense_splitter.model.Payment;
+import com.expense_splitter.expense_splitter.repository.PaymentRepository;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +39,9 @@ public class ExpenseController {
 
     @Autowired
     private ExpenseShareRepository expenseShareRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     @PostMapping
     public ResponseEntity<?> addExpense(@PathVariable Long groupId, @RequestBody AddExpenseRequest request) {
@@ -135,18 +140,26 @@ public class ExpenseController {
             List<ExpenseShare> customShares = expenseShareRepository.findByExpenseId(expense.getId());
 
             if (!customShares.isEmpty()) {
-                // Use custom shares
                 for (ExpenseShare share : customShares) {
                     Long userId = share.getUser().getId();
                     balances.put(userId, balances.get(userId) - share.getAmount());
                 }
             } else {
-                // Fall back to equal split
                 double equalShare = expense.getAmount() / memberCount;
                 for (User member : group.getMembers()) {
                     balances.put(member.getId(), balances.get(member.getId()) - equalShare);
                 }
             }
+        }
+
+        // Factor in recorded payments
+        List<Payment> payments = paymentRepository.findByGroupId(groupId);
+        for (Payment payment : payments) {
+            Long payerId = payment.getPaidBy().getId();
+            Long receiverId = payment.getPaidTo().getId();
+
+            balances.put(payerId, balances.get(payerId) + payment.getAmount());
+            balances.put(receiverId, balances.get(receiverId) - payment.getAmount());
         }
 
         List<BalanceResponse> result = new ArrayList<>();
