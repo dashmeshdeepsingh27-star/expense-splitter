@@ -1,28 +1,27 @@
 package com.expense_splitter.expense_splitter.controller;
 
-import com.expense_splitter.expense_splitter.dto.AddExpenseRequest;
+import com.expense_splitter.expense_splitter.dto.*;
 import com.expense_splitter.expense_splitter.model.Expense;
+import com.expense_splitter.expense_splitter.model.ExpenseShare;
 import com.expense_splitter.expense_splitter.model.Group;
+import com.expense_splitter.expense_splitter.model.Payment;
 import com.expense_splitter.expense_splitter.model.User;
 import com.expense_splitter.expense_splitter.repository.ExpenseRepository;
+import com.expense_splitter.expense_splitter.repository.ExpenseShareRepository;
 import com.expense_splitter.expense_splitter.repository.GroupRepository;
+import com.expense_splitter.expense_splitter.repository.PaymentRepository;
 import com.expense_splitter.expense_splitter.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import com.expense_splitter.expense_splitter.dto.BalanceResponse;
-import com.expense_splitter.expense_splitter.model.ExpenseShare;
-import com.expense_splitter.expense_splitter.repository.ExpenseShareRepository;
-import com.expense_splitter.expense_splitter.model.Payment;
-import com.expense_splitter.expense_splitter.repository.PaymentRepository;
 
-import java.util.List;
-import java.util.Optional;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/groups/{groupId}/expenses")
@@ -42,6 +41,20 @@ public class ExpenseController {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    private UserResponse toUserResponse(User user) {
+        return new UserResponse(user.getId(), user.getName(), user.getEmail());
+    }
+
+    private ExpenseResponse toExpenseResponse(Expense expense) {
+        return new ExpenseResponse(
+                expense.getId(),
+                expense.getAmount(),
+                expense.getDescription(),
+                toUserResponse(expense.getPaidBy()),
+                expense.getCreatedAt()
+        );
+    }
 
     @PostMapping
     public ResponseEntity<?> addExpense(@PathVariable Long groupId, @RequestBody AddExpenseRequest request) {
@@ -67,7 +80,6 @@ public class ExpenseController {
             return ResponseEntity.status(403).body("Only group members can add expenses");
         }
 
-        // Validate custom shares if provided
         if (request.getShares() != null && !request.getShares().isEmpty()) {
             double totalShares = request.getShares().stream()
                     .mapToDouble(AddExpenseRequest.ShareRequest::getAmount)
@@ -86,7 +98,6 @@ public class ExpenseController {
 
         expenseRepository.save(expense);
 
-        // If custom shares were provided, save them
         if (request.getShares() != null && !request.getShares().isEmpty()) {
             for (AddExpenseRequest.ShareRequest shareRequest : request.getShares()) {
                 Optional<User> shareUserOptional = userRepository.findByEmail(shareRequest.getEmail());
@@ -104,11 +115,14 @@ public class ExpenseController {
             }
         }
 
-        return ResponseEntity.ok(expense);
+        return ResponseEntity.ok(toExpenseResponse(expense));
     }
+
     @GetMapping
     public ResponseEntity<?> getExpenses(@PathVariable Long groupId) {
-        List<Expense> expenses = expenseRepository.findByGroupId(groupId);
+        List<ExpenseResponse> expenses = expenseRepository.findByGroupId(groupId).stream()
+                .map(this::toExpenseResponse)
+                .toList();
         return ResponseEntity.ok(expenses);
     }
 
@@ -152,7 +166,6 @@ public class ExpenseController {
             }
         }
 
-        // Factor in recorded payments
         List<Payment> payments = paymentRepository.findByGroupId(groupId);
         for (Payment payment : payments) {
             Long payerId = payment.getPaidBy().getId();
@@ -162,11 +175,11 @@ public class ExpenseController {
             balances.put(receiverId, balances.get(receiverId) - payment.getAmount());
         }
 
-        List<BalanceResponse> result = new ArrayList<>();
+        List<com.expense_splitter.expense_splitter.dto.BalanceResponse> result = new ArrayList<>();
 
         for (User member : group.getMembers()) {
             double balance = Math.round(balances.get(member.getId()) * 100.0) / 100.0;
-            result.add(new BalanceResponse(member.getName(), member.getEmail(), balance));
+            result.add(new com.expense_splitter.expense_splitter.dto.BalanceResponse(member.getName(), member.getEmail(), balance));
         }
 
         return ResponseEntity.ok(result);

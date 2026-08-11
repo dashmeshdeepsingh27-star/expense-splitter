@@ -1,6 +1,9 @@
 package com.expense_splitter.expense_splitter.controller;
 
+import com.expense_splitter.expense_splitter.dto.AddMemberRequest;
 import com.expense_splitter.expense_splitter.dto.CreateGroupRequest;
+import com.expense_splitter.expense_splitter.dto.GroupResponse;
+import com.expense_splitter.expense_splitter.dto.UserResponse;
 import com.expense_splitter.expense_splitter.model.Group;
 import com.expense_splitter.expense_splitter.model.User;
 import com.expense_splitter.expense_splitter.repository.GroupRepository;
@@ -24,6 +27,23 @@ public class GroupController {
 
     @Autowired
     private UserRepository userRepository;
+
+    private UserResponse toUserResponse(User user) {
+        return new UserResponse(user.getId(), user.getName(), user.getEmail());
+    }
+
+    private GroupResponse toGroupResponse(Group group) {
+        List<UserResponse> memberResponses = group.getMembers().stream()
+                .map(this::toUserResponse)
+                .toList();
+
+        return new GroupResponse(
+                group.getId(),
+                group.getName(),
+                toUserResponse(group.getCreatedBy()),
+                memberResponses
+        );
+    }
 
     @PostMapping
     public ResponseEntity<?> createGroup(@RequestBody CreateGroupRequest request) {
@@ -49,12 +69,11 @@ public class GroupController {
 
         groupRepository.save(group);
 
-        return ResponseEntity.ok(group);
+        return ResponseEntity.ok(toGroupResponse(group));
     }
 
-
     @PostMapping("/{groupId}/members")
-    public ResponseEntity<?> addMember(@PathVariable Long groupId, @RequestBody com.expense_splitter.expense_splitter.dto.AddMemberRequest request) {
+    public ResponseEntity<?> addMember(@PathVariable Long groupId, @RequestBody AddMemberRequest request) {
 
         Optional<Group> groupOptional = groupRepository.findById(groupId);
 
@@ -85,7 +104,7 @@ public class GroupController {
         group.getMembers().add(userToAdd);
         groupRepository.save(group);
 
-        return ResponseEntity.ok(group);
+        return ResponseEntity.ok(toGroupResponse(group));
     }
 
     @GetMapping("/mine")
@@ -97,8 +116,9 @@ public class GroupController {
         Optional<User> userOptional = userRepository.findByEmail(loggedInEmail);
         User currentUser = userOptional.get();
 
-        List<Group> groups = groupRepository.findAll().stream()
+        List<GroupResponse> groups = groupRepository.findAll().stream()
                 .filter(group -> group.getMembers().contains(currentUser))
+                .map(this::toGroupResponse)
                 .toList();
 
         return ResponseEntity.ok(groups);
@@ -113,6 +133,6 @@ public class GroupController {
             return ResponseEntity.status(404).body("Group not found");
         }
 
-        return ResponseEntity.ok(groupOptional.get());
+        return ResponseEntity.ok(toGroupResponse(groupOptional.get()));
     }
 }
