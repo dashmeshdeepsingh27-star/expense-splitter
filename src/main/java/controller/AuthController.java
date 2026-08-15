@@ -15,6 +15,8 @@ import com.expense_splitter.expense_splitter.service.EmailService;
 
 import java.util.Optional;
 
+
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -30,6 +32,9 @@ public class AuthController {
 
     @Autowired
     private EmailService emailService;
+
+    @org.springframework.beans.factory.annotation.Value("${google.client.id}")
+    private String googleClientId;
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
@@ -83,8 +88,7 @@ public class AuthController {
                 new com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier.Builder(
                         new com.google.api.client.http.javanet.NetHttpTransport(),
                         new com.google.api.client.json.gson.GsonFactory())
-                        .setAudience(java.util.Collections.singletonList(
-                                "866211342910-fhp7668n17655mcgtd1ghaqsegcvi300.apps.googleusercontent.com"))
+                        .setAudience(java.util.Collections.singletonList(googleClientId))
                         .build();
 
         com.google.api.client.googleapis.auth.oauth2.GoogleIdToken idToken = verifier.verify(request.getIdToken());
