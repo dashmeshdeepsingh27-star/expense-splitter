@@ -1,6 +1,8 @@
 package com.expense_splitter.expense_splitter.controller;
 
 import com.expense_splitter.expense_splitter.dto.AddPaymentRequest;
+import com.expense_splitter.expense_splitter.dto.PaymentResponse;
+import com.expense_splitter.expense_splitter.dto.UserResponse;
 import com.expense_splitter.expense_splitter.model.Group;
 import com.expense_splitter.expense_splitter.model.Payment;
 import com.expense_splitter.expense_splitter.model.User;
@@ -28,6 +30,20 @@ public class PaymentController {
     @Autowired
     private UserRepository userRepository;
 
+    private UserResponse toUserResponse(User user) {
+        return new UserResponse(user.getId(), user.getName(), user.getEmail());
+    }
+
+    private PaymentResponse toPaymentResponse(Payment payment) {
+        return new PaymentResponse(
+                payment.getId(),
+                toUserResponse(payment.getPaidBy()),
+                toUserResponse(payment.getPaidTo()),
+                payment.getAmount(),
+                payment.getCreatedAt()
+        );
+    }
+
     @PostMapping
     public ResponseEntity<?> addPayment(@PathVariable Long groupId, @RequestBody AddPaymentRequest request) {
 
@@ -49,14 +65,28 @@ public class PaymentController {
             return ResponseEntity.badRequest().body("Recipient not found");
         }
 
+        User receiver = receiverOptional.get();
+
+        if(receiver.getId().equals(payer.getId())) {
+            return  ResponseEntity.badRequest().body("You cannot record a payment to yourself");
+        }
+
         Payment payment = new Payment();
         payment.setGroup(group);
         payment.setPaidBy(payer);
-        payment.setPaidTo(receiverOptional.get());
+        payment.setPaidTo(receiver);
         payment.setAmount(request.getAmount());
 
         paymentRepository.save(payment);
 
-        return ResponseEntity.ok(payment);
+        return ResponseEntity.ok(toPaymentResponse(payment));
+    }
+
+    @GetMapping
+    public ResponseEntity<?> getPayments(@PathVariable Long groupId) {
+        var payments = paymentRepository.findByGroupId(groupId).stream()
+                .map(this::toPaymentResponse)
+                .toList();
+        return ResponseEntity.ok(payments);
     }
 }
