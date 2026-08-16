@@ -89,6 +89,9 @@ public class ExpenseController {
                 return ResponseEntity.badRequest().body("Shares must add up to the total amount");
             }
         }
+        if (request.getAmount() == null || request.getAmount() <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than zero");
+        }
 
         Expense expense = new Expense();
         expense.setAmount(request.getAmount());

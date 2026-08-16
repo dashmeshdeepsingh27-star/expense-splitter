@@ -71,6 +71,10 @@ public class PaymentController {
             return  ResponseEntity.badRequest().body("You cannot record a payment to yourself");
         }
 
+        if (request.getAmount() == null || request.getAmount() <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than zero");
+        }
+
         Payment payment = new Payment();
         payment.setGroup(group);
         payment.setPaidBy(payer);
