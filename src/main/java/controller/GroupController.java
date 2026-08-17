@@ -59,6 +59,13 @@ public class GroupController {
 
         User currentUser = userOptional.get();
 
+        boolean nameExists = groupRepository.findAll().stream()
+                .anyMatch(g -> g.getMembers().stream().anyMatch(m -> m.getId().equals(currentUser.getId()))
+                        && g.getName().equalsIgnoreCase(request.getName()));
+        if (nameExists) {
+            return ResponseEntity.badRequest().body("You already have a group with this name");
+        }
+
         Group group = new Group();
         group.setName(request.getName());
         group.setCreatedBy(currentUser);
