@@ -142,4 +142,23 @@ public class GroupController {
 
         return ResponseEntity.ok(toGroupResponse(groupOptional.get()));
     }
+
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<?> deleteGroup(@PathVariable Long groupId) {
+        Optional<Group> groupOptional = groupRepository.findById(groupId);
+        if (groupOptional.isEmpty()) {
+            return ResponseEntity.status(404).body("Group not found");
+        }
+
+        Group group = groupOptional.get();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String loggedInEmail = authentication.getName();
+
+        if(!group.getCreatedBy().getEmail().equals(loggedInEmail)){
+            return ResponseEntity.status(403).body("Only the group creator can delete this group");
+        }
+        groupRepository.delete(group);
+        return ResponseEntity.ok("Successfully deleted this group");
+    }
 }
